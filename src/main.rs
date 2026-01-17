@@ -13,8 +13,11 @@ pub extern "C" fn _start() -> ! {
 
     blog_os::init();
 
-    // invoke a breakpoint exception
-    x86_64::instructions::interrupts::int3();
+    fn stack_overflow() {
+        stack_overflow(); // for each call, the return address is pushed onto the stack
+    }
+
+    stack_overflow();
 
     #[cfg(test)]
     test_main();
