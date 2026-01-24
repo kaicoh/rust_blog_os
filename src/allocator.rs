@@ -1,4 +1,4 @@
-use linked_list_allocator::LockedHeap;
+use fixed_size_block::FixedSizeBlockAllocator;
 use x86_64::{
     VirtAddr,
     structures::paging::{
@@ -6,11 +6,37 @@ use x86_64::{
     },
 };
 
+pub mod bump;
+pub mod fixed_size_block;
+pub mod linked_list;
+
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 
 pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+
+/// A wrapper around spin::Mutex to permit trait implementations.
+pub struct Locked<T> {
+    inner: spin::Mutex<T>,
+}
+
+impl<T> Locked<T> {
+    pub const fn new(inner: T) -> Self {
+        Locked {
+            inner: spin::Mutex::new(inner),
+        }
+    }
+
+    pub fn lock(&self) -> spin::MutexGuard<'_, T> {
+        self.inner.lock()
+    }
+}
+
+/// Align the given address `addr` upwards to alignment `align`.
+fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align - 1) & !(align - 1)
+}
 
 pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,
